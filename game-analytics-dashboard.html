@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAME STATS ARENA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0221;
+    --panel: #1a1a3a;
+    --panel-edge: #2e2a5c;
+    --cyan: #08d9d6;
+    --magenta: #ff2e63;
+    --gold: #f4d35e;
+    --green: #6bff8f;
+    --ink: #eef0ff;
+    --ink-dim: #9a95c9;
+    --grid-line: rgba(238,240,255,0.06);
+  }
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #e7e4f6;
+      --panel: #fdfcff;
+      --panel-edge: #c9c2ee;
+      --ink: #1a1533;
+      --ink-dim: #5c5482;
+      --grid-line: rgba(26,21,51,0.07);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #e7e4f6;
+    --panel: #fdfcff;
+    --panel-edge: #c9c2ee;
+    --ink: #1a1533;
+    --ink-dim: #5c5482;
+    --grid-line: rgba(26,21,51,0.07);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+    color: var(--ink);
+    font-family: 'VT323', monospace;
+    font-size: 20px;
+    line-height: 1.4;
+    min-height: 100vh;
+    padding: 20px 16px 64px;
+  }
+  .pixel-font { font-family: 'Press Start 2P', cursive; }
+
+  /* --- layout shell --- */
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  /* --- pixel border utility (crisp 4-corner notch look) --- */
+  .pixel-panel {
+    background: var(--panel);
+    border: 4px solid var(--panel-edge);
+    position: relative;
+    image-rendering: pixelated;
+  }
+  .pixel-panel::before {
+    content: "";
+    position: absolute; inset: -4px;
+    border: 4px solid var(--bg);
+    pointer-events: none;
+    clip-path: polygon(
+      0 8px, 8px 8px, 8px 0, calc(100% - 8px) 0, calc(100% - 8px) 8px, 100% 8px,
+      100% calc(100% - 8px), calc(100% - 8px) calc(100% - 8px), calc(100% - 8px) 100%,
+      8px 100%, 8px calc(100% - 8px), 0 calc(100% - 8px)
+    );
+  }
+
+  /* --- header / marquee --- */
+  header { text-align: center; margin-bottom: 28px; }
+  .marquee {
+    padding: 28px 16px;
+    background: linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%);
+    border: 4px solid var(--panel-edge);
+    margin-bottom: 18px;
+  }
+  .title {
+    font-size: clamp(20px, 5vw, 34px);
+    color: var(--cyan);
+    text-shadow: 3px 3px 0 var(--magenta);
+    letter-spacing: 2px;
+    margin: 0 0 14px;
+  }
+  .subtitle {
+    font-size: 20px;
+    color: var(--ink-dim);
+    margin: 0;
+  }
+  .subtitle b { color: var(--gold); font-weight: normal; }
+
+  .stat-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 20px;
+  }
+  .stat-chip {
+    background: var(--bg);
+    border: 3px solid var(--panel-edge);
+    padding: 10px 16px;
+    min-width: 120px;
+  }
+  .stat-chip .num { font-family: 'Press Start 2P'; font-size: 16px; color: var(--gold); display:block; margin-bottom:6px;}
+  .stat-chip .lbl { font-size: 16px; color: var(--ink-dim); }
+
+  /* --- tabs (arcade buttons) --- */
+  nav.tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+    justify-content: center;
+  }
+  .tab-btn {
+    font-family: 'Press Start 2P';
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--panel);
+    border: 3px solid var(--panel-edge);
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: center;
+    transition: transform 0.06s ease;
+  }
+  .tab-btn:hover { transform: translateY(-2px); }
+  .tab-btn:active { transform: translateY(1px); }
+  .tab-btn.active {
+    background: var(--cyan);
+    color: #06121f;
+    border-color: var(--cyan);
+  }
+  .tab-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  section.view { display: none; }
+  section.view.active { display: block; }
+
+  h2.section-title {
+    font-family: 'Press Start 2P';
+    font-size: 15px;
+    color: var(--gold);
+    margin: 0 0 6px;
+  }
+  p.section-sub { color: var(--ink-dim); margin: 0 0 20px; font-size: 19px; }
+
+  .card { padding: 20px; margin-bottom: 20px; }
+
+  /* --- leaderboard --- */
+  .leaderboard { display: grid; gap: 10px; }
+  .lb-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto auto auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border-left: 4px solid var(--panel-edge);
+  }
+  .lb-row.gold { border-left-color: var(--gold); }
+  .lb-row.silver { border-left-color: #c7c9d9; }
+  .lb-row.bronze { border-left-color: #c98a4b; }
+  .lb-pos { font-family: 'Press Start 2P'; font-size: 13px; color: var(--ink-dim); }
+  .lb-name { font-size: 21px; }
+  .lb-name .rank-tag { font-size: 14px; color: var(--ink-dim); display:block; }
+  .lb-kd { font-family: 'Press Start 2P'; font-size: 14px; color: var(--cyan); text-align:right; }
+  .lb-wr { font-size: 18px; color: var(--green); text-align:right; min-width: 70px; }
+  .lb-hr { font-size: 18px; color: var(--ink-dim); text-align:right; min-width: 60px; }
+
+  /* --- filters --- */
+  .filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .filter-btn {
+    font-family: 'VT323'; font-size: 18px;
+    background: var(--bg); color: var(--ink);
+    border: 2px solid var(--panel-edge);
+    padding: 6px 12px; cursor: pointer;
+  }
+  .filter-btn.active { background: var(--magenta); border-color: var(--magenta); color: #fff; }
+
+  /* --- full table --- */
+  table { width: 100%; border-collapse: collapse; font-size: 18px; }
+  th, td { padding: 8px 10px; text-align: left; border-bottom: 2px solid var(--grid-line); }
+  th { color: var(--gold); font-family: 'Press Start 2P'; font-size: 11px; }
+  td.num, th.num { text-align: right; }
+  .table-scroll { overflow-x: auto; }
+
+  /* --- charts --- */
+  canvas { display: block; width: 100%; image-rendering: pixelated; }
+  .chart-wrap { background: var(--bg); border: 3px solid var(--panel-edge); padding: 14px; }
+  .callout {
+    margin-top: 16px;
+    padding: 14px 16px;
+    background: var(--bg);
+    border-left: 4px solid var(--cyan);
+    font-size: 19px;
+  }
+  .callout b { color: var(--gold); }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin-top: 10px; font-size: 16px; color: var(--ink-dim); }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .swatch { width: 12px; height: 12px; display:inline-block; }
+
+  footer {
+    text-align: center;
+    color: var(--ink-dim);
+    font-size: 16px;
+    margin-top: 30px;
+  }
+
+  @media (max-width: 560px) {
+    .lb-row { grid-template-columns: 30px 1fr auto; }
+    .lb-wr, .lb-hr { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="marquee pixel-panel">
+      <h1 class="title pixel-font">GAME STATS ARENA</h1>
+      <p class="subtitle">Análise de desempenho de <b>30 jogadores</b> ao longo de <b id="totalHoras"></b> horas de jogo</p>
+      <div class="stat-row" id="statRow"></div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab-btn active" data-view="ranking">🏆 RANKING</button>
+    <button class="tab-btn" data-view="q1">⏱ HORAS x DESEMPENHO</button>
+    <button class="tab-btn" data-view="q2">🗡 PERSONAGENS</button>
+    <button class="tab-btn" data-view="q3">🛡 RANKS</button>
+  </nav>
+
+  <!-- RANKING VIEW -->
+  <section class="view active" id="view-ranking">
+    <div class="card pixel-panel">
+      <h2 class="section-title">TOP 10 — MAIOR K/D</h2>
+      <p class="section-sub">Os jogadores com a melhor razão kills/deaths da temporada</p>
+      <div class="leaderboard" id="leaderboard"></div>
+    </div>
+
+    <div class="card pixel-panel">
+      <h2 class="section-title">TABELA COMPLETA</h2>
+      <p class="section-sub">Jogador · Horas jogadas · Vitórias · Derrotas · K/D · Rank</p>
+      <div class="filters" id="rankFilters"></div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Jogador</th>
+              <th class="num">Horas</th>
+              <th class="num">Vitórias</th>
+              <th class="num">Derrotas</th>
+              <th class="num">K/D</th>
+              <th>Rank</th>
+            </tr>
+          </thead>
+          <tbody id="fullTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Q1 VIEW -->
+  <section class="view" id="view-q1">
+    <div class="card pixel-panel">
+      <h2 class="section-title">HORAS JOGADAS x DESEMPENHO</h2>
+      <p class="section-sub">Cada bloco é um jogador — posição horizontal é horas jogadas, altura é a taxa de vitória</p>
+      <div class="chart-wrap"><canvas id="chartQ1" height="360"></canvas></div>
+      <div class="callout" id="calloutQ1"></div>
+    </div>
+  </section>
+
+  <!-- Q2 VIEW -->
+  <section class="view" id="view-q2">
+    <div class="card pixel-panel">
+      <h2 class="section-title">TAXA DE VITÓRIA POR PERSONAGEM</h2>
+      <p class="section-sub">Qual personagem carrega mais vitórias pro time?</p>
+      <div class="chart-wrap"><canvas id="chartQ2" height="360"></canvas></div>
+      <div class="callout" id="calloutQ2"></div>
+    </div>
+  </section>
+
+  <!-- Q3 VIEW -->
+  <section class="view" id="view-q3">
+    <div class="card pixel-panel">
+      <h2 class="section-title">K/D MÉDIO POR RANK</h2>
+      <p class="section-sub">O K/D médio sobe junto com o rank do jogador?</p>
+      <div class="chart-wrap"><canvas id="chartQ3" height="360"></canvas></div>
+      <div class="callout" id="calloutQ3"></div>
+    </div>
+  </section>
+
+  <footer>
+    Dados sintéticos gerados para fins de estudo · Pipeline C# → SQL → Python → Dashboard
+  </footer>
+</div>
+
+<script>
+const DATA = {"jogadores": [{"nome": "Pedro", "horas": 25.2, "vitorias": 28, "derrotas": 22, "kd": 2.99, "winrate": 56.0, "rank": "Diamante"}, {"nome": "Bruno", "horas": 35.6, "vitorias": 49, "derrotas": 25, "kd": 2.93, "winrate": 66.2, "rank": "Diamante"}, {"nome": "Rafa", "horas": 44.1, "vitorias": 61, "derrotas": 33, "kd": 2.58, "winrate": 64.9, "rank": "Platina"}, {"nome": "Helena", "horas": 33.5, "vitorias": 42, "derrotas": 29, "kd": 2.55, "winrate": 59.2, "rank": "Platina"}, {"nome": "Livia", "horas": 12.7, "vitorias": 20, "derrotas": 9, "kd": 2.45, "winrate": 69.0, "rank": "Platina"}, {"nome": "Sofia", "horas": 28.0, "vitorias": 41, "derrotas": 17, "kd": 2.33, "winrate": 70.7, "rank": "Platina"}, {"nome": "Gabriel", "horas": 17.8, "vitorias": 18, "derrotas": 21, "kd": 2.3, "winrate": 46.2, "rank": "Platina"}, {"nome": "Miguel", "horas": 47.1, "vitorias": 51, "derrotas": 47, "kd": 2.27, "winrate": 52.0, "rank": "Platina"}, {"nome": "Valentina", "horas": 12.7, "vitorias": 16, "derrotas": 9, "kd": 2.25, "winrate": 64.0, "rank": "Diamante"}, {"nome": "Manuela", "horas": 31.4, "vitorias": 32, "derrotas": 33, "kd": 2.22, "winrate": 49.2, "rank": "Platina"}, {"nome": "Heloisa", "horas": 50.3, "vitorias": 63, "derrotas": 49, "kd": 2.21, "winrate": 56.2, "rank": "Platina"}, {"nome": "Camila", "horas": 57.0, "vitorias": 72, "derrotas": 51, "kd": 2.11, "winrate": 58.5, "rank": "Platina"}, {"nome": "Gustavo", "horas": 69.4, "vitorias": 83, "derrotas": 62, "kd": 2.1, "winrate": 57.2, "rank": "Platina"}, {"nome": "Yuri", "horas": 16.1, "vitorias": 14, "derrotas": 22, "kd": 2.09, "winrate": 38.9, "rank": "Ouro"}, {"nome": "Thiago", "horas": 61.5, "vitorias": 65, "derrotas": 63, "kd": 2.07, "winrate": 50.8, "rank": "Platina"}, {"nome": "Vitor", "horas": 71.0, "vitorias": 76, "derrotas": 77, "kd": 1.96, "winrate": 49.7, "rank": "Ouro"}, {"nome": "Larissa", "horas": 43.3, "vitorias": 44, "derrotas": 49, "kd": 1.92, "winrate": 47.3, "rank": "Ouro"}, {"nome": "Enzo", "horas": 31.8, "vitorias": 29, "derrotas": 34, "kd": 1.89, "winrate": 46.0, "rank": "Ouro"}, {"nome": "Julia", "horas": 25.5, "vitorias": 24, "derrotas": 30, "kd": 1.85, "winrate": 44.4, "rank": "Platina"}, {"nome": "Kaique", "horas": 32.8, "vitorias": 38, "derrotas": 32, "kd": 1.82, "winrate": 54.3, "rank": "Ouro"}, {"nome": "Bianca", "horas": 60.5, "vitorias": 57, "derrotas": 63, "kd": 1.79, "winrate": 47.5, "rank": "Ouro"}, {"nome": "Alice", "horas": 14.8, "vitorias": 17, "derrotas": 15, "kd": 1.75, "winrate": 53.1, "rank": "Platina"}, {"nome": "Laura", "horas": 61.1, "vitorias": 61, "derrotas": 63, "kd": 1.74, "winrate": 49.2, "rank": "Ouro"}, {"nome": "Marina", "horas": 71.8, "vitorias": 74, "derrotas": 68, "kd": 1.72, "winrate": 52.1, "rank": "Ouro"}, {"nome": "Isabela", "horas": 20.8, "vitorias": 21, "derrotas": 25, "kd": 1.66, "winrate": 45.7, "rank": "Ouro"}, {"nome": "Arthur", "horas": 27.9, "vitorias": 30, "derrotas": 29, "kd": 1.45, "winrate": 50.8, "rank": "Ouro"}, {"nome": "Lucas", "horas": 49.5, "vitorias": 39, "derrotas": 64, "kd": 1.3, "winrate": 37.9, "rank": "Prata"}, {"nome": "Matheus", "horas": 52.8, "vitorias": 45, "derrotas": 67, "kd": 1.2, "winrate": 40.2, "rank": "Prata"}, {"nome": "Davi", "horas": 71.8, "vitorias": 56, "derrotas": 102, "kd": 1.18, "winrate": 35.4, "rank": "Prata"}, {"nome": "Diego", "horas": 28.1, "vitorias": 19, "derrotas": 41, "kd": 1.03, "winrate": 31.7, "rank": "Prata"}], "personagens": [{"nome": "Cinzas", "partidas": 216, "vitorias": 129, "winrate": 59.7}, {"nome": "Aço", "partidas": 213, "vitorias": 121, "winrate": 56.8}, {"nome": "Trovão", "partidas": 282, "vitorias": 142, "winrate": 50.4}, {"nome": "Fênix", "partidas": 432, "vitorias": 217, "winrate": 50.2}, {"nome": "Lâmina", "partidas": 331, "vitorias": 165, "winrate": 49.8}, {"nome": "Guardião", "partidas": 177, "vitorias": 87, "winrate": 49.2}, {"nome": "Corvo", "partidas": 279, "vitorias": 137, "winrate": 49.1}, {"nome": "Nômade", "partidas": 174, "vitorias": 85, "winrate": 48.9}, {"nome": "Sombra", "partidas": 244, "vitorias": 115, "winrate": 47.1}, {"nome": "Fantasma", "partidas": 188, "vitorias": 87, "winrate": 46.3}], "ranks": [{"rank": "Prata", "kd_medio": 1.18, "jogadores": 4}, {"rank": "Ouro", "kd_medio": 1.8, "jogadores": 10}, {"rank": "Platina", "kd_medio": 2.21, "jogadores": 13}, {"rank": "Diamante", "kd_medio": 2.72, "jogadores": 3}], "correlacoes": {"horas_winrate": -0.17, "horas_kd": -0.27}, "totais": {"jogadores": 30, "partidas": 2536, "personagens": 10, "horas_totais": 1206.0}};
+
+const RANK_COLOR = {
+  "Bronze": "#c98a4b", "Prata": "#c7c9d9", "Ouro": "#f4d35e",
+  "Platina": "#08d9d6", "Diamante": "#a78bfa", "Mestre": "#ff2e63"
+};
+
+function css(varName){
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
+
+// ---------- header stats ----------
+document.getElementById('totalHoras').textContent = DATA.totais.horas_totais.toLocaleString('pt-BR');
+const statRow = document.getElementById('statRow');
+[
+  ["JOGADORES", DATA.totais.jogadores],
+  ["PARTIDAS", DATA.totais.partidas.toLocaleString('pt-BR')],
+  ["PERSONAGENS", DATA.totais.personagens],
+  ["HORAS TOTAIS", DATA.totais.horas_totais.toLocaleString('pt-BR')]
+].forEach(([lbl, num]) => {
+  const el = document.createElement('div');
+  el.className = 'stat-chip';
+  el.innerHTML = `<span class="num">${num}</span><span class="lbl">${lbl}</span>`;
+  statRow.appendChild(el);
+});
+
+// ---------- tabs ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+  });
+});
+
+// ---------- leaderboard (top 10 KD) ----------
+const top10 = [...DATA.jogadores].sort((a,b) => b.kd - a.kd).slice(0, 10);
+const lbEl = document.getElementById('leaderboard');
+top10.forEach((j, i) => {
+  const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+  const row = document.createElement('div');
+  row.className = 'lb-row ' + medalClass;
+  row.innerHTML = `
+    <div class="lb-pos">#${i+1}</div>
+    <div class="lb-name">${j.nome}<span class="rank-tag">${j.rank}</span></div>
+    <div class="lb-hr">${j.horas}h</div>
+    <div class="lb-wr">${j.winrate}% WR</div>
+    <div class="lb-kd">${j.kd.toFixed(2)}</div>
+  `;
+  lbEl.appendChild(row);
+});
+
+// ---------- full table + rank filters ----------
+const ranksOrdem = ["Bronze","Prata","Ouro","Platina","Diamante","Mestre"];
+const ranksPresentes = ranksOrdem.filter(r => DATA.jogadores.some(j => j.rank === r));
+const filterBar = document.getElementById('rankFilters');
+const tableBody = document.getElementById('fullTable');
+
+function renderTable(filterRank){
+  tableBody.innerHTML = '';
+  const rows = [...DATA.jogadores]
+    .filter(j => filterRank === 'Todos' || j.rank === filterRank)
+    .sort((a,b) => b.kd - a.kd);
+  rows.forEach(j => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${j.nome}</td>
+      <td class="num">${j.horas}</td>
+      <td class="num">${j.vitorias}</td>
+      <td class="num">${j.derrotas}</td>
+      <td class="num" style="color:${RANK_COLOR[j.rank]}">${j.kd.toFixed(2)}</td>
+      <td style="color:${RANK_COLOR[j.rank]}">${j.rank}</td>
+    `;
+    tableBody.appendChild(tr);
+  });
+}
+
+['Todos', ...ranksPresentes].forEach(r => {
+  const b = document.createElement('button');
+  b.className = 'filter-btn' + (r === 'Todos' ? ' active' : '');
+  b.textContent = r;
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    renderTable(r);
+  });
+  filterBar.appendChild(b);
+});
+renderTable('Todos');
+
+// ---------- pixel chart helpers ----------
+function setupCanvas(canvas){
+  const parent = canvas.parentElement;
+  const cssWidth = parent.clientWidth - 28;
+  const cssHeight = canvas.height;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = cssWidth * dpr;
+  canvas.height = cssHeight * dpr;
+  canvas.style.height = cssHeight + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.imageSmoothingEnabled = false;
+  return { ctx, w: cssWidth, h: cssHeight };
+}
+
+// draws a "blocky" bar made of stacked pixel segments
+function drawPixelBar(ctx, x, yBase, width, height, color, segment=6){
+  const steps = Math.max(1, Math.round(height / segment));
+  for(let s = 0; s < steps; s++){
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(x), Math.round(yBase - (s+1)*segment), Math.round(width), segment - 2);
+  }
+}
+
+function drawAxes(ctx, w, h, padL, padB, ink, dim){
+  ctx.strokeStyle = dim;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(padL, 10);
+  ctx.lineTo(padL, h - padB);
+  ctx.lineTo(w - 10, h - padB);
+  ctx.stroke();
+}
+
+// ---------- Q1: horas x winrate scatter (pixel dots) ----------
+function renderQ1(){
+  const canvas = document.getElementById('chartQ1');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const ink = css('--ink'), dim = css('--ink-dim'), cyan = css('--cyan'), magenta = css('--magenta');
+  ctx.clearRect(0,0,w,h);
+
+  const padL = 50, padB = 34, padT = 16, padR = 16;
+  drawAxes(ctx, w, h, padL, padB, ink, dim);
+
+  const maxHoras = Math.max(...DATA.jogadores.map(j => j.horas)) * 1.05;
+  const maxWR = 100;
+
+  // grid + labels
+  ctx.fillStyle = dim; ctx.font = '12px VT323, monospace';
+  for(let i=0;i<=4;i++){
+    const wr = i * 25;
+    const y = h - padB - (wr/maxWR) * (h - padB - padT);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText(wr + '%', 6, y + 4);
+  }
+  ctx.fillText('Horas jogadas →', padL, h - 8);
+
+  DATA.jogadores.forEach(j => {
+    const x = padL + (j.horas / maxHoras) * (w - padL - padR);
+    const y = h - padB - (j.winrate / maxWR) * (h - padB - padT);
+    const size = 10;
+    ctx.fillStyle = RANK_COLOR[j.rank] || cyan;
+    ctx.fillRect(Math.round(x - size/2), Math.round(y - size/2), size, size);
+  });
+
+  document.getElementById('calloutQ1').innerHTML =
+    `Correlação horas × win rate: <b>${DATA.correlacoes.horas_winrate}</b> &nbsp;|&nbsp; horas × K/D: <b>${DATA.correlacoes.horas_kd}</b><br>
+     Valores perto de 0 = correlação fraca. Nesse dataset, <b>jogar mais horas sozinho não prevê melhor desempenho</b> —
+     jogadores com poucas horas aparecem tanto no topo quanto na base do ranking. Isso sugere que outros fatores
+     (consistência recente, personagem escolhido, adaptação ao meta) pesam mais que volume bruto de jogo.`;
+}
+
+// ---------- Q2: winrate por personagem ----------
+function renderQ2(){
+  const canvas = document.getElementById('chartQ2');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dim = css('--ink-dim'), cyan = css('--cyan'), gold = css('--gold');
+  ctx.clearRect(0,0,w,h);
+
+  const padL = 46, padB = 70, padT = 16, padR = 16;
+  drawAxes(ctx, w, h, padL, padB, '', dim);
+
+  const data = [...DATA.personagens].sort((a,b) => b.winrate - a.winrate);
+  const maxWR = 70;
+  const n = data.length;
+  const gap = 14;
+  const barW = (w - padL - padR - gap*(n-1)) / n;
+
+  ctx.fillStyle = dim; ctx.font = '12px VT323, monospace';
+  for(let i=0;i<=4;i++){
+    const wr = i * (maxWR/4);
+    const y = h - padB - (wr/maxWR) * (h - padB - padT);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText(wr.toFixed(0) + '%', 4, y + 4);
+  }
+
+  data.forEach((p, i) => {
+    const x = padL + i * (barW + gap);
+    const barH = (p.winrate / maxWR) * (h - padB - padT);
+    const color = i === 0 ? gold : cyan;
+    drawPixelBar(ctx, x, h - padB, barW, barH, color, 5);
+    ctx.save();
+    ctx.translate(x + barW/2, h - padB + 8);
+    ctx.rotate(Math.PI/5);
+    ctx.fillStyle = dim;
+    ctx.font = '13px VT323, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(p.nome, 0, 0);
+    ctx.restore();
+  });
+
+  const top = data[0], bottom = data[data.length-1];
+  document.getElementById('calloutQ2').innerHTML =
+    `<b>${top.nome}</b> lidera com ${top.winrate}% de vitórias em ${top.partidas} partidas.
+     <b>${bottom.nome}</b> tem a menor taxa (${bottom.winrate}%). A diferença entre o topo e a base é de
+     <b>${(top.winrate - bottom.winrate).toFixed(1)} pontos percentuais</b> — um indício de desbalanceamento
+     entre personagens que vale a pena investigar no design do jogo.`;
+}
+
+// ---------- Q3: kd medio por rank ----------
+function renderQ3(){
+  const canvas = document.getElementById('chartQ3');
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dim = css('--ink-dim');
+  ctx.clearRect(0,0,w,h);
+
+  const padL = 46, padB = 50, padT = 16, padR = 16;
+  drawAxes(ctx, w, h, padL, padB, '', dim);
+
+  const order = ["Bronze","Prata","Ouro","Platina","Diamante","Mestre"];
+  const data = DATA.ranks.slice().sort((a,b) => order.indexOf(a.rank) - order.indexOf(b.rank));
+  const maxKD = Math.max(...data.map(r => r.kd_medio)) * 1.2;
+  const n = data.length;
+  const gap = 24;
+  const barW = (w - padL - padR - gap*(n-1)) / n;
+
+  ctx.fillStyle = dim; ctx.font = '12px VT323, monospace';
+  for(let i=0;i<=4;i++){
+    const val = (maxKD/4) * i;
+    const y = h - padB - (val/maxKD) * (h - padB - padT);
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText(val.toFixed(1), 4, y + 4);
+  }
+
+  data.forEach((r, i) => {
+    const x = padL + i * (barW + gap);
+    const barH = (r.kd_medio / maxKD) * (h - padB - padT);
+    drawPixelBar(ctx, x, h - padB, barW, barH, RANK_COLOR[r.rank], 6);
+    ctx.fillStyle = dim;
+    ctx.font = '13px VT323, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(r.rank, x + barW/2, h - padB + 20);
+    ctx.fillStyle = RANK_COLOR[r.rank];
+    ctx.font = '14px Press Start 2P, monospace';
+    ctx.fillText(r.kd_medio.toFixed(2), x + barW/2, h - padB - barH - 10);
+  });
+  ctx.textAlign = 'left';
+
+  const melhor = data.reduce((a,b) => a.kd_medio > b.kd_medio ? a : b);
+  const pior = data.reduce((a,b) => a.kd_medio < b.kd_medio ? a : b);
+  document.getElementById('calloutQ3').innerHTML =
+    `O K/D médio <b>cresce junto com o rank</b>: de ${pior.kd_medio.toFixed(2)} no ${pior.rank} até
+     <b>${melhor.kd_medio.toFixed(2)} no ${melhor.rank}</b>. Isso é o esperado — ranks mais altos deveriam
+     refletir jogadores com melhor relação kills/deaths — o que serve como uma checagem de sanidade de que
+     o sistema de rank do jogo está funcionando bem.`;
+}
+
+renderQ1(); renderQ2(); renderQ3();
+window.addEventListener('resize', () => { renderQ1(); renderQ2(); renderQ3(); });
+</script>
+</body>
+</html>
